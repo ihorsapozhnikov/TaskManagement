@@ -169,4 +169,51 @@ public class TaskServiceTests
 
         Assert.Equal("Invalid status transition.", exception.Message);
     }
+
+    [Fact]
+    public void GetTasksByAssignee_ReturnsTasksForSpecifiedAssignee()
+    {
+        var taskService = CreateTaskService(out _);
+
+        var result = taskService.GetTasksByAssignee(2);
+
+        Assert.NotEmpty(result);
+        Assert.All(result, task => Assert.Equal(2, task.AssigneeId));
+    }
+
+    [Fact]
+    public void GetTasksByAssignee_ReturnsAllTasksForSpecifiedAssignee()
+    {
+        var taskService = CreateTaskService(out var dbContext);
+
+        var existingTasksCount = dbContext.Tasks.Count(t => t.AssigneeId == 2);
+
+        dbContext.Tasks.Add(new TaskItem
+        {
+            Title = "Additional task",
+            Description = "Test description",
+            PlannedStartAt = PlannedStartAt,
+            DueAt = DueAt,
+            Status = Domain.TaskStatus.New,
+            CreatedByEmployeeId = 1,
+            AssigneeId = 2
+        });
+
+        dbContext.SaveChanges();
+
+        var result = taskService.GetTasksByAssignee(2);
+
+        Assert.Equal(existingTasksCount + 1, result.Count);
+        Assert.All(result, task => Assert.Equal(2, task.AssigneeId));
+    }
+
+    [Fact]
+    public void GetTasksByAssignee_NoTasks_ReturnsEmptyList()
+    {
+        var taskService = CreateTaskService(out _);
+        var result = taskService.GetTasksByAssignee(3);
+
+        Assert.Empty(result);
+    }
+
 }

@@ -98,6 +98,8 @@ public class TaskService : ITaskService
 
     public IReadOnlyList<TaskItem> GetTasksByAssignee(int assigneeId)
     {
-        throw new NotImplementedException();
+        return _dbContext.Tasks
+            .Where(t => t.AssigneeId == assigneeId)
+            .ToList();
     }
 }
