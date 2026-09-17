@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TaskManagement.Domain;
+using TaskManagement.Infrastructure.Seed;
 
 namespace TaskManagement.Infrastructure;
 
@@ -15,6 +16,7 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        SeedData.Configure(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
 }
