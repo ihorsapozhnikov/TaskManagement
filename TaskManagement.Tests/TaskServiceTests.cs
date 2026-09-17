@@ -7,30 +7,31 @@ namespace TaskManagement.Tests;
 
 public class TaskServiceTests
 {
+    private readonly AppDbContext _dbContext;
+    private readonly TaskService _taskService;
+
     private static readonly DateTime PlannedStartAt = new(2026, 9, 17, 10, 0, 0);
     private static readonly DateTime DueAt = new(2026, 9, 17, 18, 0, 0);
     private static readonly DateTime InvalidPlannedStartAt = new(2026, 9, 17, 18, 0, 0);
     private static readonly DateTime InvalidDueAt = new(2026, 9, 17, 10, 0, 0);
 
-    private static TaskService CreateTaskService(out AppDbContext dbContext)
+    public TaskServiceTests()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        dbContext = new AppDbContext(options);
-        dbContext.Database.EnsureCreated();
+        _dbContext = new AppDbContext(options);
+        _dbContext.Database.EnsureCreated();
 
-        return new TaskService(dbContext);
+        _taskService = new TaskService(_dbContext);
     }
 
     [Fact]
     public void CreateTask_InactiveAssignee_Throws()
     {
-        var taskService = CreateTaskService(out _);
-
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            taskService.CreateTask(
+            _taskService.CreateTask(
                 title: "Test task",
                 description: "Test description",
                 plannedStartAt: PlannedStartAt,
@@ -44,10 +45,8 @@ public class TaskServiceTests
     [Fact]
     public void CreateTask_CreatorIsAssignee_Throws()
     {
-        var taskService = CreateTaskService(out _);
-
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            taskService.CreateTask(
+            _taskService.CreateTask(
                 title: "Test task",
                 description: "Test description",
                 plannedStartAt: PlannedStartAt,
@@ -61,10 +60,8 @@ public class TaskServiceTests
     [Fact]
     public void CreateTask_DueDateEarlierThanPlannedStart_Throws()
     {
-        var taskService = CreateTaskService(out _);
-
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            taskService.CreateTask(
+            _taskService.CreateTask(
                 title: "Test task",
                 description: "Test description",
                 plannedStartAt: InvalidPlannedStartAt,
@@ -78,9 +75,7 @@ public class TaskServiceTests
     [Fact]
     public void CreateTask_ValidData_CreatesTask()
     {
-        var taskService = CreateTaskService(out var dbContext);
-
-        var task = taskService.CreateTask(
+        var task = _taskService.CreateTask(
             title: "New test task",
             description: "Test description",
             plannedStartAt: PlannedStartAt,
@@ -98,7 +93,7 @@ public class TaskServiceTests
         Assert.Equal(1, task.CreatedByEmployeeId);
         Assert.Equal(2, task.AssigneeId);
 
-        var savedTask = dbContext.Tasks.Single(t => t.Id == task.Id);
+        var savedTask = _dbContext.Tasks.Single(t => t.Id == task.Id);
 
         Assert.Equal(task.Id, savedTask.Id);
         Assert.Equal(task.Title, savedTask.Title);
@@ -112,9 +107,8 @@ public class TaskServiceTests
     [Fact]
     public void ChangeStatus_NewToInProgress_ChangesStatus()
     {
-        var taskService = CreateTaskService(out var dbContext);
-        taskService.ChangeStatus(1, Domain.TaskStatus.InProgress);
-        var task = dbContext.Tasks.Single(t => t.Id == 1);
+        _taskService.ChangeStatus(1, Domain.TaskStatus.InProgress);
+        var task = _dbContext.Tasks.Single(t => t.Id == 1);
 
         Assert.Equal(Domain.TaskStatus.InProgress, task.Status);
     }
@@ -122,9 +116,8 @@ public class TaskServiceTests
     [Fact]
     public void ChangeStatus_NewToCancelled_ChangesStatus()
     {
-        var taskService = CreateTaskService(out var dbContext);
-        taskService.ChangeStatus(1, Domain.TaskStatus.Cancelled);
-        var task = dbContext.Tasks.Single(t => t.Id == 1);
+        _taskService.ChangeStatus(1, Domain.TaskStatus.Cancelled);
+        var task = _dbContext.Tasks.Single(t => t.Id == 1);
 
         Assert.Equal(Domain.TaskStatus.Cancelled, task.Status);
     }
@@ -132,9 +125,8 @@ public class TaskServiceTests
     [Fact]
     public void ChangeStatus_InProgressToCompleted_ChangesStatusAndSetsCompletedAt()
     {
-        var taskService = CreateTaskService(out var dbContext);
-        taskService.ChangeStatus(2, Domain.TaskStatus.Completed);
-        var task = dbContext.Tasks.Single(t => t.Id == 2);
+        _taskService.ChangeStatus(2, Domain.TaskStatus.Completed);
+        var task = _dbContext.Tasks.Single(t => t.Id == 2);
 
         Assert.Equal(Domain.TaskStatus.Completed, task.Status);
         Assert.NotNull(task.CompletedAt);
@@ -144,9 +136,8 @@ public class TaskServiceTests
     [Fact]
     public void ChangeStatus_InProgressToCancelled_ChangesStatus()
     {
-        var taskService = CreateTaskService(out var dbContext);
-        taskService.ChangeStatus(2, Domain.TaskStatus.Cancelled);
-        var task = dbContext.Tasks.Single(t => t.Id == 2);
+        _taskService.ChangeStatus(2, Domain.TaskStatus.Cancelled);
+        var task = _dbContext.Tasks.Single(t => t.Id == 2);
 
         Assert.Equal(Domain.TaskStatus.Cancelled, task.Status);
     }
@@ -154,8 +145,7 @@ public class TaskServiceTests
     [Fact]
     public void ChangeStatus_CompletedTask_Throws()
     {
-        var taskService = CreateTaskService(out var dbContext);
-        var exception = Assert.Throws<InvalidOperationException>(() => taskService.ChangeStatus(3, Domain.TaskStatus.InProgress));
+        var exception = Assert.Throws<InvalidOperationException>(() => _taskService.ChangeStatus(3, Domain.TaskStatus.InProgress));
 
         Assert.Equal("Invalid status transition.", exception.Message);
     }
@@ -163,9 +153,8 @@ public class TaskServiceTests
     [Fact]
     public void ChangeStatus_CancelledTask_Throws()
     {
-        var taskService = CreateTaskService(out var dbContext);
-        taskService.ChangeStatus(1, Domain.TaskStatus.Cancelled);
-        var exception = Assert.Throws<InvalidOperationException>(() => taskService.ChangeStatus(1, Domain.TaskStatus.InProgress));
+        _taskService.ChangeStatus(1, Domain.TaskStatus.Cancelled);
+        var exception = Assert.Throws<InvalidOperationException>(() => _taskService.ChangeStatus(1, Domain.TaskStatus.InProgress));
 
         Assert.Equal("Invalid status transition.", exception.Message);
     }
@@ -173,9 +162,7 @@ public class TaskServiceTests
     [Fact]
     public void GetTasksByAssignee_ReturnsTasksForSpecifiedAssignee()
     {
-        var taskService = CreateTaskService(out _);
-
-        var result = taskService.GetTasksByAssignee(2);
+        var result = _taskService.GetTasksByAssignee(2);
 
         Assert.NotEmpty(result);
         Assert.All(result, task => Assert.Equal(2, task.AssigneeId));
@@ -184,11 +171,9 @@ public class TaskServiceTests
     [Fact]
     public void GetTasksByAssignee_ReturnsAllTasksForSpecifiedAssignee()
     {
-        var taskService = CreateTaskService(out var dbContext);
+        var existingTasksCount = _dbContext.Tasks.Count(t => t.AssigneeId == 2);
 
-        var existingTasksCount = dbContext.Tasks.Count(t => t.AssigneeId == 2);
-
-        dbContext.Tasks.Add(new TaskItem
+        _dbContext.Tasks.Add(new TaskItem
         {
             Title = "Additional task",
             Description = "Test description",
@@ -199,9 +184,9 @@ public class TaskServiceTests
             AssigneeId = 2
         });
 
-        dbContext.SaveChanges();
+        _dbContext.SaveChanges();
 
-        var result = taskService.GetTasksByAssignee(2);
+        var result = _taskService.GetTasksByAssignee(2);
 
         Assert.Equal(existingTasksCount + 1, result.Count);
         Assert.All(result, task => Assert.Equal(2, task.AssigneeId));
@@ -210,10 +195,46 @@ public class TaskServiceTests
     [Fact]
     public void GetTasksByAssignee_NoTasks_ReturnsEmptyList()
     {
-        var taskService = CreateTaskService(out _);
-        var result = taskService.GetTasksByAssignee(3);
+        var result = _taskService.GetTasksByAssignee(3);
 
         Assert.Empty(result);
     }
 
+    [Fact]
+    public void CreateTask_AssigneeNotFound_Throws()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _taskService.CreateTask(
+                title: "Test task",
+                description: "Test description",
+                plannedStartAt: PlannedStartAt,
+                dueAt: DueAt,
+                createdByEmployeeId: 1,
+                assigneeId: int.MaxValue));
+
+        Assert.Equal("Assignee not found.", exception.Message);
+    }
+
+    [Fact]
+    public void CreateTask_CreatorNotFound_Throws()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _taskService.CreateTask(
+                title: "Test task",
+                description: "Test description",
+                plannedStartAt: PlannedStartAt,
+                dueAt: DueAt,
+                createdByEmployeeId: int.MaxValue,
+                assigneeId: 2));
+
+        Assert.Equal("Creator not found.", exception.Message);
+    }
+
+    [Fact]
+    public void ChangeStatus_TaskNotFound_Throws()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => _taskService.ChangeStatus(int.MaxValue, Domain.TaskStatus.InProgress));
+
+        Assert.Equal("Task not found.", exception.Message);
+    }
 }
