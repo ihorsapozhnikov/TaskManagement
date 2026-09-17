@@ -44,6 +44,10 @@ public class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.ToTable("Tasks", tableBuilder =>
         {
             tableBuilder.HasCheckConstraint(
+                "CK_Tasks_Status_Valid",
+                "\"Status\" IN (0, 1, 2, 3)");
+
+            tableBuilder.HasCheckConstraint(
                 "CK_Tasks_DueAt_GreaterThanOrEqual_PlannedStartAt",
                 "\"DueAt\" >= \"PlannedStartAt\"");
 
