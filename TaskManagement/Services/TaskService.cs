@@ -64,7 +64,36 @@ public class TaskService : ITaskService
 
     public void ChangeStatus(int taskId, Domain.TaskStatus newStatus)
     {
-        throw new NotImplementedException();
+        var task = _dbContext.Tasks.SingleOrDefault(t => t.Id == taskId);
+
+        if (task is null)
+        {
+            throw new InvalidOperationException("Task not found.");
+        }
+
+        if (task.Status == Domain.TaskStatus.New &&
+            (newStatus == Domain.TaskStatus.InProgress || newStatus == Domain.TaskStatus.Cancelled))
+        {
+            task.Status = newStatus;
+            _dbContext.SaveChanges();
+            return;
+        }
+
+        if (task.Status == Domain.TaskStatus.InProgress &&
+            (newStatus == Domain.TaskStatus.Completed || newStatus == Domain.TaskStatus.Cancelled))
+        {
+            task.Status = newStatus;
+
+            if (newStatus == Domain.TaskStatus.Completed)
+            {
+                task.CompletedAt = DateTime.UtcNow;
+            }
+
+            _dbContext.SaveChanges();
+            return;
+        }
+
+        throw new InvalidOperationException("Invalid status transition.");
     }
 
     public IReadOnlyList<TaskItem> GetTasksByAssignee(int assigneeId)

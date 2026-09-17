@@ -12,6 +12,18 @@ public class TaskServiceTests
     private static readonly DateTime InvalidPlannedStartAt = new(2026, 9, 17, 18, 0, 0);
     private static readonly DateTime InvalidDueAt = new(2026, 9, 17, 10, 0, 0);
 
+    private static TaskService CreateTaskService(out AppDbContext dbContext)
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        dbContext = new AppDbContext(options);
+        dbContext.Database.EnsureCreated();
+
+        return new TaskService(dbContext);
+    }
+
     [Fact]
     public void CreateTask_InactiveAssignee_Throws()
     {
@@ -97,16 +109,64 @@ public class TaskServiceTests
         Assert.Null(savedTask.CompletedAt);
     }
 
-    private static TaskService CreateTaskService(out AppDbContext dbContext)
+    [Fact]
+    public void ChangeStatus_NewToInProgress_ChangesStatus()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
+        var taskService = CreateTaskService(out var dbContext);
+        taskService.ChangeStatus(1, Domain.TaskStatus.InProgress);
+        var task = dbContext.Tasks.Single(t => t.Id == 1);
 
-        dbContext = new AppDbContext(options);
+        Assert.Equal(Domain.TaskStatus.InProgress, task.Status);
+    }
 
-        dbContext.Database.EnsureCreated();
+    [Fact]
+    public void ChangeStatus_NewToCancelled_ChangesStatus()
+    {
+        var taskService = CreateTaskService(out var dbContext);
+        taskService.ChangeStatus(1, Domain.TaskStatus.Cancelled);
+        var task = dbContext.Tasks.Single(t => t.Id == 1);
 
-        return new TaskService(dbContext);
+        Assert.Equal(Domain.TaskStatus.Cancelled, task.Status);
+    }
+
+    [Fact]
+    public void ChangeStatus_InProgressToCompleted_ChangesStatusAndSetsCompletedAt()
+    {
+        var taskService = CreateTaskService(out var dbContext);
+        taskService.ChangeStatus(2, Domain.TaskStatus.Completed);
+        var task = dbContext.Tasks.Single(t => t.Id == 2);
+
+        Assert.Equal(Domain.TaskStatus.Completed, task.Status);
+        Assert.NotNull(task.CompletedAt);
+        Assert.True(task.CompletedAt <= DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void ChangeStatus_InProgressToCancelled_ChangesStatus()
+    {
+        var taskService = CreateTaskService(out var dbContext);
+        taskService.ChangeStatus(2, Domain.TaskStatus.Cancelled);
+        var task = dbContext.Tasks.Single(t => t.Id == 2);
+
+        Assert.Equal(Domain.TaskStatus.Cancelled, task.Status);
+    }
+
+    [Fact]
+    public void ChangeStatus_CompletedTask_Throws()
+    {
+        var taskService = CreateTaskService(out var dbContext);
+        var exception = Assert.Throws<InvalidOperationException>(() => taskService.ChangeStatus(3, Domain.TaskStatus.InProgress));
+
+        Assert.Equal("Invalid status transition.", exception.Message);
+    }
+
+    [Fact]
+    public void ChangeStatus_CancelledTask_Throws()
+    {
+        var taskService = CreateTaskService(out var dbContext);
+        taskService.ChangeStatus(1, Domain.TaskStatus.Cancelled);
+        var exception = Assert.Throws<InvalidOperationException>(() => taskService.ChangeStatus(1, Domain.TaskStatus.InProgress));
+
+        Assert.Equal("Invalid status transition.", exception.Message);
     }
 }
