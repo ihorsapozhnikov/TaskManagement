@@ -37,6 +37,22 @@ The project provides task creation, assignment, status management, validation of
 * PostgreSQL
 * xUnit
 * EF Core InMemory provider for tests
+* Microsoft.Extensions.TimeProvider.Testing
+
+## Time Contract
+
+All application timestamps use UTC.
+
+### Rules
+
+* All `DateTime` values accepted by the service layer must have `DateTimeKind.Utc`.
+* Local and `DateTimeKind.Unspecified` values are not accepted.
+* Timestamps represent an absolute point in time and are handled by the application as UTC.
+* `CompletedAt` is assigned using the injected `TimeProvider` when a task transitions to `Completed`.
+* The production implementation uses the system UTC time.
+* Tests use a fake time provider to make time-dependent behavior deterministic.
+* `CompletedAt` is `null` for tasks that are not in the `Completed` state.
+* The service validates timestamp values before performing database operations.
 
 ## How to run
 

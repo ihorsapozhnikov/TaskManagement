@@ -7,14 +7,21 @@ namespace TaskManagement.Services;
 public class TaskService : ITaskService
 {
     private readonly AppDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public TaskService(AppDbContext dbContext)
+    public TaskService(AppDbContext dbContext, TimeProvider timeProvider)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider;
     }
 
     public TaskItem CreateTask(string title, string? description, DateTime plannedStartAt, DateTime dueAt, int createdByEmployeeId, int assigneeId)
     {
+        if (plannedStartAt.Kind != DateTimeKind.Utc || dueAt.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("All timestamps must be in UTC.");
+        }
+
         var assignee = _dbContext.Employees.SingleOrDefault(e => e.Id == assigneeId);
 
         if (assignee is null)
@@ -86,7 +93,7 @@ public class TaskService : ITaskService
 
             if (newStatus == Domain.TaskStatus.Completed)
             {
-                task.CompletedAt = DateTime.UtcNow;
+                task.CompletedAt = _timeProvider.GetUtcNow().UtcDateTime;
             }
 
             _dbContext.SaveChanges();

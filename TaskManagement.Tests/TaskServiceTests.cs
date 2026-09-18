@@ -2,6 +2,7 @@
 using TaskManagement.Domain;
 using TaskManagement.Infrastructure;
 using TaskManagement.Services;
+using Microsoft.Extensions.Time.Testing;
 
 namespace TaskManagement.Tests;
 
@@ -10,10 +11,12 @@ public class TaskServiceTests
     private readonly AppDbContext _dbContext;
     private readonly TaskService _taskService;
 
-    private static readonly DateTime PlannedStartAt = new(2026, 9, 17, 10, 0, 0);
-    private static readonly DateTime DueAt = new(2026, 9, 17, 18, 0, 0);
-    private static readonly DateTime InvalidPlannedStartAt = new(2026, 9, 17, 18, 0, 0);
-    private static readonly DateTime InvalidDueAt = new(2026, 9, 17, 10, 0, 0);
+    private readonly FakeTimeProvider _timeProvider;
+
+    private static readonly DateTime PlannedStartAt = new(2026, 9, 17, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime DueAt = new(2026, 9, 17, 18, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime InvalidPlannedStartAt = new(2026, 9, 17, 18, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime InvalidDueAt = new(2026, 9, 17, 10, 0, 0, DateTimeKind.Utc);
 
     public TaskServiceTests()
     {
@@ -24,7 +27,9 @@ public class TaskServiceTests
         _dbContext = new AppDbContext(options);
         _dbContext.Database.EnsureCreated();
 
-        _taskService = new TaskService(_dbContext);
+        _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 9, 17, 15, 0, 0, TimeSpan.Zero));
+
+        _taskService = new TaskService(_dbContext, _timeProvider);
     }
 
     [Fact]
@@ -123,14 +128,18 @@ public class TaskServiceTests
     }
 
     [Fact]
-    public void ChangeStatus_InProgressToCompleted_ChangesStatusAndSetsCompletedAt()
+    public void ChangeStatus_InProgressToCompleted_SetsCompletedAt()
     {
-        _taskService.ChangeStatus(2, Domain.TaskStatus.Completed);
         var task = _dbContext.Tasks.Single(t => t.Id == 2);
 
+        var expectedCompletedAt = new DateTime(2026, 9, 17, 15, 0, 0, DateTimeKind.Utc);
+
+        _timeProvider.SetUtcNow(expectedCompletedAt);
+
+        _taskService.ChangeStatus(task.Id, Domain.TaskStatus.Completed);
+
         Assert.Equal(Domain.TaskStatus.Completed, task.Status);
-        Assert.NotNull(task.CompletedAt);
-        Assert.True(task.CompletedAt <= DateTime.UtcNow);
+        Assert.Equal(expectedCompletedAt, task.CompletedAt);
     }
 
     [Fact]
@@ -236,5 +245,23 @@ public class TaskServiceTests
         var exception = Assert.Throws<InvalidOperationException>(() => _taskService.ChangeStatus(int.MaxValue, Domain.TaskStatus.InProgress));
 
         Assert.Equal("Task not found.", exception.Message);
+    }
+
+    [Fact]
+    public void CreateTask_NonUtcTimestamps_Throws()
+    {
+        var plannedStartAt = new DateTime(2026, 9, 17, 10, 0, 0);
+        var dueAt = new DateTime(2026, 9, 17, 18, 0, 0);
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _taskService.CreateTask(
+                title: "Test task",
+                description: "Test description",
+                plannedStartAt: plannedStartAt,
+                dueAt: dueAt,
+                createdByEmployeeId: 1,
+                assigneeId: 2));
+
+        Assert.Equal("All timestamps must be in UTC.", exception.Message);
     }
 }
