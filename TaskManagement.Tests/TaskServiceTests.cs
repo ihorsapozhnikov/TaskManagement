@@ -264,4 +264,72 @@ public class TaskServiceTests
 
         Assert.Equal("All timestamps must be in UTC.", exception.Message);
     }
+
+    [Fact]
+    public void ChangeStatus_IncrementsVersion()
+    {
+        var task = _dbContext.Tasks.Single(t => t.Id == 1);
+        var initialVersion = task.Version;
+        _taskService.ChangeStatus(task.Id, Domain.TaskStatus.InProgress);
+
+        Assert.Equal(initialVersion + 1, task.Version);
+    }
+
+    [Fact]
+    public void ChangeStatus_WithConcurrentDbContexts_ThrowsConcurrencyException()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        using var context1 = new AppDbContext(options);
+        using var context2 = new AppDbContext(options);
+
+        context1.Database.EnsureCreated();
+
+        var service1 = new TaskService(context1, _timeProvider);
+        var service2 = new TaskService(context2, _timeProvider);
+
+        var task1 = context1.Tasks.Single(t => t.Id == 1);
+        var task2 = context2.Tasks.Single(t => t.Id == 1);
+
+        Assert.Equal(task1.Version, task2.Version);
+
+        service1.ChangeStatus(task1.Id, Domain.TaskStatus.InProgress);
+
+        Assert.Throws<DbUpdateConcurrencyException>(() => service2.ChangeStatus(task2.Id, Domain.TaskStatus.Cancelled));
+    }
+
+    [Fact]
+    public void ChangeStatus_WithConcurrentDbContexts_PreservesFirstChange()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(databaseName)
+            .Options;
+
+        using var context1 = new AppDbContext(options);
+        using var context2 = new AppDbContext(options);
+        using var verificationContext = new AppDbContext(options);
+
+        context1.Database.EnsureCreated();
+
+        var service1 = new TaskService(context1, _timeProvider);
+        var service2 = new TaskService(context2, _timeProvider);
+
+        var task1 = context1.Tasks.Single(t => t.Id == 1);
+        var task2 = context2.Tasks.Single(t => t.Id == 1);
+
+        service1.ChangeStatus(task1.Id, Domain.TaskStatus.InProgress);
+
+        Assert.Throws<DbUpdateConcurrencyException>(() => service2.ChangeStatus(task2.Id, Domain.TaskStatus.Cancelled));
+
+        var savedTask = verificationContext.Tasks.Single(t => t.Id == 1);
+
+        Assert.Equal(Domain.TaskStatus.InProgress, savedTask.Status);
+        Assert.Equal(2, savedTask.Version);
+    }
 }

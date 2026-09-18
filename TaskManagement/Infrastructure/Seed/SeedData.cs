@@ -45,6 +45,7 @@ public static class SeedData
                 DueAt = new DateTime(2026, 9, 20, 18, 0, 0, DateTimeKind.Utc),
                 Status = Domain.TaskStatus.New,
                 CompletedAt = null,
+                Version = 1,
                 CreatedByEmployeeId = 1,
                 AssigneeId = 2
             },
@@ -57,6 +58,7 @@ public static class SeedData
                 DueAt = new DateTime(2026, 9, 18, 18, 0, 0, DateTimeKind.Utc),
                 Status = Domain.TaskStatus.InProgress,
                 CompletedAt = null,
+                Version = 1,
                 CreatedByEmployeeId = 2,
                 AssigneeId = 1
             },
@@ -69,6 +71,7 @@ public static class SeedData
                 DueAt = new DateTime(2026, 9, 5, 18, 0, 0, DateTimeKind.Utc),
                 Status = Domain.TaskStatus.Completed,
                 CompletedAt = new DateTime(2026, 9, 4, 15, 30, 0, DateTimeKind.Utc),
+                Version = 1,
                 CreatedByEmployeeId = 1,
                 AssigneeId = 2
             }

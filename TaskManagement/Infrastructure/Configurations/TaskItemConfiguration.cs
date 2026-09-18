@@ -29,6 +29,10 @@ public class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(t => t.CompletedAt)
             .IsRequired(false);
 
+        builder.Property(t => t.Version)
+            .IsRequired()
+            .IsConcurrencyToken();
+
         builder.HasOne(t => t.CreatedByEmployee)
             .WithMany(e => e.CreatedTasks)
             .HasForeignKey(t => t.CreatedByEmployeeId)

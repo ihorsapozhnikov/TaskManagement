@@ -59,6 +59,7 @@ public class TaskService : ITaskService
             DueAt = dueAt,
             Status = Domain.TaskStatus.New,
             CompletedAt = null,
+            Version = 1,
             CreatedByEmployeeId = createdByEmployeeId,
             AssigneeId = assigneeId
         };
@@ -82,6 +83,8 @@ public class TaskService : ITaskService
             (newStatus == Domain.TaskStatus.InProgress || newStatus == Domain.TaskStatus.Cancelled))
         {
             task.Status = newStatus;
+            task.Version++;
+
             _dbContext.SaveChanges();
             return;
         }
@@ -95,6 +98,7 @@ public class TaskService : ITaskService
             {
                 task.CompletedAt = _timeProvider.GetUtcNow().UtcDateTime;
             }
+            task.Version++;
 
             _dbContext.SaveChanges();
             return;
